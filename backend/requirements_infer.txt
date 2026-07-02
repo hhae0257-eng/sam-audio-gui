@@ -1,0 +1,11 @@
+# SAM-Audio GUI 백엔드 추론 의존성.
+# torch/torchaudio/torchvision 은 install.ps1에서 cu128 인덱스로 먼저 설치한다(Blackwell).
+# sam-audio 본체는 git에서 설치 (무거운 git 서브의존성 포함: dacvae, imagebind, perception-models, laion-clap).
+sam-audio @ git+https://github.com/facebookresearch/sam-audio.git
+
+# 로컬 상주 서버
+fastapi
+uvicorn
+
+# HF 게이트 체크포인트 로그인/다운로드
+huggingface_hub[cli]

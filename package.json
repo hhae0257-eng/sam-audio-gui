@@ -1,0 +1,15 @@
+{
+  "name": "sam-audio-gui",
+  "version": "0.1.0",
+  "description": "SAM-Audio GUI — text-prompt audio source separation (dialogue / effects / music)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "node scripts/setup-ffmpeg.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

@@ -1,0 +1,28 @@
+# 의존성 / 런타임 (설치 시 자동 생성)
+node_modules/
+venv/
+vendor/
+hf-cache/
+
+# 모델 가중치 — 절대 커밋 금지 (수 GB, HF 게이트). 사용자가 직접 받음.
+models/
+.checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+
+# 작업 결과물
+results/
+
+# 파이썬 캐시 / 개발용 임시 스크립트
+__pycache__/
+*.pyc
+backend/_*.py
+
+# 기타
+*.log
+.DS_Store
+Thumbs.db

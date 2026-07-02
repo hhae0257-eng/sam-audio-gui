@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; media-src file: 'self'; style-src 'self' 'unsafe-inline';" />
+  <title>SAM-Audio 분리 도구</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎧 SAM-Audio <span class="sub">소리 분리 도구</span></div>
+    <div class="status" id="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">백엔드 확인 중…</span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-mode="dialogue">🗣️ 대사/음성</button>
+    <button class="tab" data-mode="effects">🔊 효과음/특정소리</button>
+    <button class="tab" data-mode="music">🎵 음악/BGM</button>
+    <button class="tab" data-mode="advanced">⚙️ 고급</button>
+  </nav>
+
+  <main class="content">
+    <!-- 드롭존 -->
+    <section class="dropzone" id="dropzone">
+      <div class="drop-inner">
+        <div class="drop-icon">⬇️</div>
+        <div class="drop-title">영상 또는 오디오 파일을 여기에 놓으세요</div>
+        <div class="drop-sub" id="dropSub">또는 클릭해서 선택 · mp4/mov/mkv/wav/mp3 …</div>
+      </div>
+    </section>
+
+    <!-- 모드별 프롬프트 영역 -->
+    <section class="panel">
+      <div id="modeDesc" class="mode-desc"></div>
+
+      <div class="field" id="presetField" style="display:none">
+        <label>분리 대상</label>
+        <select id="presetSelect"></select>
+      </div>
+
+      <div class="field" id="promptField" style="display:none">
+        <label>프롬프트 (영어 소문자 명사/동사구)</label>
+        <input type="text" id="promptInput" placeholder="예: dog barking, footsteps, car honking" />
+        <div class="hint">예시를 클릭:
+          <span class="chip" data-p="footsteps">footsteps</span>
+          <span class="chip" data-p="dog barking">dog barking</span>
+          <span class="chip" data-p="car honking">car honking</span>
+          <span class="chip" data-p="applause">applause</span>
+          <span class="chip" data-p="rain">rain</span>
+          <span class="chip" data-p="gunshot">gunshot</span>
+        </div>
+      </div>
+
+      <!-- 고급 옵션 -->
+      <div id="advancedBox" style="display:none">
+        <div class="field">
+          <label>스팬 앵커 (선택) — 대상 소리가 들리는 시간범위(초). 여러 개는 줄바꿈.</label>
+          <textarea id="anchorInput" rows="2" placeholder="예: 6.3 7.0"></textarea>
+          <div class="hint">한 줄당 "시작 끝" (초). 비워두면 텍스트 프롬프트만 사용.</div>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="predictSpans" /> predict_spans (모델이 구간 예측)</label>
+          <div class="field inline">
+            <label>reranking_candidates: <span id="rerankVal">1</span></label>
+            <input type="range" id="rerankRange" min="1" max="8" value="1" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 공통 설정 -->
+      <div class="row settings">
+        <div class="field inline">
+          <label>모델 크기</label>
+          <select id="modelSize">
+            <option value="small">small (빠름)</option>
+            <option value="base" selected>base (권장)</option>
+            <option value="large">large (고품질/느림)</option>
+          </select>
+        </div>
+        <div class="field inline">
+          <label>속도/품질</label>
+          <select id="speed">
+            <option value="fast">빠름 (8스텝, ~4배)</option>
+            <option value="balanced" selected>균형 (16스텝, ~2배)</option>
+            <option value="quality">고품질 (32스텝, 기본)</option>
+          </select>
+        </div>
+        <label class="check" id="remuxLabel"><input type="checkbox" id="remuxCheck" /> 결과를 원본 영상에 다시 합치기(리먹스)</label>
+      </div>
+
+      <button class="run" id="runBtn" disabled>분리 시작</button>
+    </section>
+
+    <!-- 진행 -->
+    <section class="progress" id="progress" style="display:none">
+      <div class="spinner"></div>
+      <div class="progress-text" id="progressText">처리 중…</div>
+      <div class="progress-elapsed" id="progressElapsed">0.0초</div>
+    </section>
+
+    <!-- 결과 -->
+    <section class="results" id="results" style="display:none">
+      <h3>결과 <span class="elapsed" id="resultElapsed"></span></h3>
+      <div class="result-card">
+        <div class="result-head">🎯 target — 뽑아낸 소리</div>
+        <audio id="targetAudio" controls></audio>
+        <div class="result-actions">
+          <button data-save="target">저장</button>
+          <button data-reveal="target">폴더 열기</button>
+        </div>
+      </div>
+      <div class="result-card">
+        <div class="result-head">🌫️ residual — 나머지 소리</div>
+        <audio id="residualAudio" controls></audio>
+        <div class="result-actions">
+          <button data-save="residual">저장</button>
+          <button data-reveal="residual">폴더 열기</button>
+        </div>
+      </div>
+      <div class="result-card" id="videoCard" style="display:none">
+        <div class="result-head">🎬 리먹스 영상 (target 오디오 적용)</div>
+        <div class="result-actions">
+          <button data-save="video">저장</button>
+          <button data-reveal="video">폴더 열기</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 로그 -->
+    <section class="logbox">
+      <div class="log-head" id="logToggle">▶ 로그</div>
+      <pre id="log" class="log" style="display:none"></pre>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
