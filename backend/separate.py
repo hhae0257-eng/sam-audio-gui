@@ -70,6 +70,10 @@ SPEED_PRESETS = {
     "fast": {"method": "midpoint", "options": {"step_size": 2 / 8}},       # 8 NFE (~4배 빠름)
 }
 
+# 모델별 대략 필요 VRAM(MiB). 이보다 GPU 총 VRAM이 작으면 로드를 막고 안내한다.
+# large(가중치 14.9GB)는 활성화 메모리까지 하면 16GB 카드엔 안 들어간다.
+MIN_VRAM_MIB = {"small": 5000, "base": 11000, "large": 20000}
+
 
 def _device():
     return "cuda" if torch.cuda.is_available() else "cpu"
@@ -82,13 +86,34 @@ def load_model(size: str):
     if _cache["size"] == size and _cache["model"] is not None:
         return _cache["model"], _cache["proc"]
 
+    # 크기 전환(또는 재시도) 시 이전 모델을 먼저 해제한다.
+    # (안 그러면 base와 large가 동시에 VRAM을 점유해 OOM으로 프로세스가 죽는다.)
+    if _cache["model"] is not None:
+        _cache.update(size=None, model=None, proc=None)
+        import gc
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    dev = _device()
+
+    # VRAM 사전 점검 — 못 담을 모델이면 크래시 대신 명확히 안내한다.
+    if dev == "cuda":
+        total_mib = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024)
+        need = MIN_VRAM_MIB.get(size, 11000)
+        if total_mib < need:
+            raise RuntimeError(
+                f"'{size}' 모델은 약 {need // 1000}GB VRAM이 필요한데 이 GPU는 "
+                f"{total_mib / 1024:.0f}GB뿐입니다. 더 작은 모델(base 또는 small)을 선택하세요."
+            )
+
     # 지연 import — 서버 기동을 빠르게, import 오류를 여기서 잡기 위해.
     from sam_audio import SAMAudio, SAMAudioProcessor
 
     _patch_hub_mixin()  # from_pretrained 버전 호환 패치 (SAMAudio + 내부 랭커/저지 전부)
 
     model_dir = _ensure_model_dir(size)
-    dev = _device()
 
     # from_pretrained는 내부에서 랭커/저지 모델도 빌드한다(각자 checkpoint.pt 다운로드).
     model = SAMAudio.from_pretrained(model_dir).eval()

@@ -73,13 +73,28 @@ async function start() {
 // 분리 요청. payload는 server.py /separate 스키마를 따른다.
 async function separate(payload) {
   if (!proc || !port) await start();
-  const res = await fetch(base() + '/separate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    // 대형 파일/large 모델은 오래 걸릴 수 있음 — 넉넉히.
-    signal: AbortSignal.timeout(30 * 60 * 1000),
-  });
+  let res;
+  try {
+    res = await fetch(base() + '/separate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      // 대형 파일/large 모델은 오래 걸릴 수 있음 — 넉넉히.
+      signal: AbortSignal.timeout(60 * 60 * 1000),
+    });
+  } catch (e) {
+    // fetch 자체 실패 = 연결이 끊김. 서버가 처리 중 종료됐거나(대개 VRAM 부족/OOM) 시간 초과.
+    // 죽었을 수 있는 서버를 정리해 다음 시도에 재시작되게 한다.
+    stop();
+    const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    if (timedOut) {
+      throw new Error('분리가 제한 시간(1시간)을 넘었습니다. 더 짧은 클립·빠름 프리셋·더 작은 모델(base/small)을 쓰세요.');
+    }
+    throw new Error(
+      '백엔드가 응답 중 종료되었습니다. VRAM 부족(OOM)일 가능성이 큽니다 — '
+      + 'large는 16GB GPU에 안 들어갑니다. base 또는 small 모델, 짧은 클립, 빠름 프리셋을 시도하세요.'
+    );
+  }
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }

@@ -182,6 +182,7 @@ runBtn.addEventListener('click', async () => {
     lastResult = r;
     await showResults(r);
     const wall = (Date.now() - jobStartTs) / 1000;
+    recordThroughput(modelSize.value, speedSel.value, wall);  // 다음 예상시간 보정
     showToast('✅ 분리 완료', `${fmtDur(wall)} 만에 끝났어요`, false);
     window.api.notifyDone({ title: 'SAM-Audio 분리 완료', body: `${fmtDur(wall)} 만에 완료됐습니다.`, ok: true });
   } catch (e) {
@@ -206,11 +207,28 @@ function fmtDur(sec) {
   return s ? `${m}분 ${s}초` : `${m}분`;
 }
 
+// (모델,프리셋)별 실측 처리속도(오디오 1초당 연산 초)를 기억해 예상에 반영.
+function tpKey(model, speed) { return `samgui_tp_${model}_${speed}`; }
+function recordThroughput(model, speed, wallSec) {
+  if (!inputDuration) return;
+  const tp = wallSec / inputDuration;
+  if (!isFinite(tp) || tp <= 0) return;
+  try {
+    // 지수이동평균으로 부드럽게 보정 (기존값 70% + 신규 30%)
+    const prev = parseFloat(localStorage.getItem(tpKey(model, speed)) || '');
+    const next = isFinite(prev) ? prev * 0.7 + tp * 0.3 : tp;
+    localStorage.setItem(tpKey(model, speed), String(next));
+  } catch { /* localStorage 불가 무시 */ }
+}
 function estimateSeconds() {
   if (!inputDuration) return 0;
-  const f = SPEED_FACTOR[speedSel.value] || 40;
-  const m = MODEL_MULT[modelSize.value] || 1;
-  return inputDuration * f * m;
+  let tp = NaN;
+  try { tp = parseFloat(localStorage.getItem(tpKey(modelSize.value, speedSel.value)) || ''); } catch {}
+  if (!isFinite(tp) || tp <= 0) {
+    // 실측 이력 없으면 러프 기본값
+    tp = (SPEED_FACTOR[speedSel.value] || 40) * (MODEL_MULT[modelSize.value] || 1);
+  }
+  return inputDuration * tp;
 }
 
 function startElapsed() {
