@@ -263,7 +263,15 @@ def start_download(size: str = "base") -> dict:
         try:
             from huggingface_hub import snapshot_download
 
-            snapshot_download(repo_id=CKPT[size])
+            # 프로젝트 models/sam-audio-<size>/ 로 바로 받는다(앱 경로에 자기완결).
+            # config.json + checkpoint.pt 만 있으면 되므로 그 둘만 받는다.
+            local_dir = os.path.join(LOCAL_MODELS, f"sam-audio-{size}")
+            os.makedirs(local_dir, exist_ok=True)
+            snapshot_download(
+                repo_id=CKPT[size],
+                local_dir=local_dir,
+                allow_patterns=["config.json", "checkpoint.pt"],
+            )
             _dl.update(state="done")
         except Exception as e:  # noqa: BLE001
             _dl.update(state="error", error=str(e))
