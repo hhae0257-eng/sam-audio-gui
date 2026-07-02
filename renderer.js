@@ -280,7 +280,7 @@ document.querySelectorAll('[data-save]').forEach(btn => {
     const kind = btn.dataset.save;
     const p = pathFor(kind);
     if (!p) return;
-    const name = ({ target: 'target.wav', residual: 'residual.wav', video: 'target_video.mp4' })[kind];
+    const name = p.split(/[\\/]/).pop(); // 실제 파일명(입력명_라벨.wav)을 기본 저장명으로
     const saved = await window.api.saveAs(p, name);
     if (saved) log('💾 저장됨: ' + saved);
   });
