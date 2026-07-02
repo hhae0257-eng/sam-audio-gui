@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   saveAs: (src, name) => ipcRenderer.invoke('save-as', src, name),
   reveal: (p) => ipcRenderer.invoke('reveal', p),
   toFileUrl: (p) => ipcRenderer.invoke('to-file-url', p),
+  notifyDone: (payload) => ipcRenderer.invoke('notify-done', payload),
 
   onBackendLog: (cb) => ipcRenderer.on('backend-log', (_e, m) => cb(m)),
   onJobProgress: (cb) => ipcRenderer.on('job-progress', (_e, m) => cb(m)),

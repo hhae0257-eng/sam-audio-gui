@@ -1,8 +1,13 @@
 // ── 상태 ──────────────────────────────────────────────
 let inputPath = null;
+let inputDuration = 0;      // 입력 길이(초) — 예상 소요시간 계산용
 let currentMode = 'dialogue';
 let lastResult = null;      // { targetPath, residualPath, remuxPath, isVideo }
 let elapsedTimer = null;
+
+// 대략적 소요시간 추정 계수 (실시간 배수). 현 GPU/모델 기준 러프값.
+const SPEED_FACTOR = { fast: 26, balanced: 40, quality: 56 };
+const MODEL_MULT = { small: 0.6, base: 1.0, large: 1.9 };
 
 // 모드별 UI 구성
 const MODES = {
@@ -55,6 +60,9 @@ const runBtn = $('runBtn');
 const progress = $('progress');
 const progressText = $('progressText');
 const progressElapsed = $('progressElapsed');
+const progressEta = $('progressEta');
+const doneBanner = $('doneBanner');
+const toastWrap = $('toastWrap');
 const results = $('results');
 const logEl = $('log');
 
@@ -110,6 +118,7 @@ async function setInput(p) {
   const info = await window.api.probe(p);
   const isVid = /\.(mp4|mov|mkv|avi|webm|m4v|wmv|flv|mpg|mpeg|ts)$/i.test(p);
   remuxLabel.style.display = isVid ? '' : 'none';
+  inputDuration = (info && info.duration) || 0;
   if (info && info.duration) {
     dropSub.textContent = `${name} · ${info.duration.toFixed(1)}초` + (info.hasAudio ? '' : ' · ⚠️ 오디오 없음');
   }
@@ -172,9 +181,15 @@ runBtn.addEventListener('click', async () => {
     });
     lastResult = r;
     await showResults(r);
+    const wall = (Date.now() - jobStartTs) / 1000;
+    showToast('✅ 분리 완료', `${fmtDur(wall)} 만에 끝났어요`, false);
+    window.api.notifyDone({ title: 'SAM-Audio 분리 완료', body: `${fmtDur(wall)} 만에 완료됐습니다.`, ok: true });
   } catch (e) {
-    log('❌ 오류: ' + (e.message || e));
+    const msg = e.message || String(e);
+    log('❌ 오류: ' + msg);
     progressText.textContent = '오류가 발생했습니다. 로그를 확인하세요.';
+    showToast('❌ 분리 실패', msg.slice(0, 120), true);
+    window.api.notifyDone({ title: 'SAM-Audio 분리 실패', body: msg.slice(0, 120), ok: false });
   } finally {
     stopElapsed();
     progress.style.display = 'none';
@@ -182,19 +197,50 @@ runBtn.addEventListener('click', async () => {
   }
 });
 
+let jobStartTs = 0;
+
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return sec + '초';
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return s ? `${m}분 ${s}초` : `${m}분`;
+}
+
+function estimateSeconds() {
+  if (!inputDuration) return 0;
+  const f = SPEED_FACTOR[speedSel.value] || 40;
+  const m = MODEL_MULT[modelSize.value] || 1;
+  return inputDuration * f * m;
+}
+
 function startElapsed() {
-  const t0 = Date.now();
-  progressElapsed.textContent = '0.0초';
-  progressText.textContent = '준비 중…';
+  jobStartTs = Date.now();
+  progressElapsed.textContent = '경과 0.0초';
+  progressText.textContent = '분리 중…';
+  const est = estimateSeconds();
+  progressEta.textContent = est ? `· 예상 약 ${fmtDur(est)}` : '';
   elapsedTimer = setInterval(() => {
-    progressElapsed.textContent = ((Date.now() - t0) / 1000).toFixed(1) + '초';
+    progressElapsed.textContent = '경과 ' + ((Date.now() - jobStartTs) / 1000).toFixed(1) + '초';
   }, 100);
 }
 function stopElapsed() { if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; } }
 
+// 화면 우하단 토스트
+function showToast(title, body, isErr) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (isErr ? ' err' : '');
+  const t = document.createElement('div'); t.className = 'toast-title'; t.textContent = title;
+  const b = document.createElement('div'); b.className = 'toast-body'; b.textContent = body || '';
+  el.appendChild(t); el.appendChild(b);
+  toastWrap.appendChild(el);
+  setTimeout(() => { el.classList.add('fade'); setTimeout(() => el.remove(), 400); }, 6000);
+}
+
 async function showResults(r) {
   results.style.display = '';
-  $('resultElapsed').textContent = r.elapsed ? `(${r.elapsed}초)` : '';
+  const wall = (Date.now() - jobStartTs) / 1000;
+  doneBanner.textContent = `✅ 분리 완료! (${fmtDur(wall)})`;
+  $('resultElapsed').textContent = r.elapsed ? `(모델 ${r.elapsed}초)` : '';
   $('targetAudio').src = await window.api.toFileUrl(r.targetPath);
   $('residualAudio').src = await window.api.toFileUrl(r.residualPath);
   $('videoCard').style.display = r.remuxPath ? '' : 'none';

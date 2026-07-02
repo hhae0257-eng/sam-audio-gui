@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -24,6 +24,9 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile('index.html');
 
+  // 창을 다시 보면 작업표시줄 깜빡임 해제
+  mainWindow.on('focus', () => mainWindow.flashFrame(false));
+
   // 백엔드 로그를 렌더러 콘솔 패널로 전달
   backend.onLog(msg => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -33,6 +36,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Windows 토스트 알림이 앱 이름으로 뜨도록 AppUserModelID 설정
+  if (process.platform === 'win32') app.setAppUserModelId('SAM-Audio GUI');
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -141,6 +146,20 @@ ipcMain.handle('save-as', async (_e, srcPath, suggestedName) => {
 ipcMain.handle('reveal', async (_e, p) => {
   shell.showItemInFolder(p);
   return true;
+});
+
+// 완료/실패 시 OS 데스크톱 알림 + 창이 뒤에 있으면 작업표시줄 깜빡임
+ipcMain.handle('notify-done', async (_e, payload = {}) => {
+  const { title = 'SAM-Audio', body = '', ok = true } = payload;
+  try {
+    if (Notification.isSupported()) {
+      new Notification({ title, body, silent: false }).show();
+    }
+  } catch { /* 알림 미지원 환경 무시 */ }
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+    mainWindow.flashFrame(true);
+  }
+  return ok;
 });
 
 // 렌더러 <audio>가 로컬 파일을 재생할 수 있게 file:// URL 반환

@@ -98,11 +98,17 @@
     <section class="progress" id="progress" style="display:none">
       <div class="spinner"></div>
       <div class="progress-text" id="progressText">처리 중…</div>
-      <div class="progress-elapsed" id="progressElapsed">0.0초</div>
+      <div class="progress-bar"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+      <div class="progress-times">
+        <span class="progress-elapsed" id="progressElapsed">경과 0.0초</span>
+        <span class="progress-eta" id="progressEta"></span>
+      </div>
+      <div class="progress-hint">창을 닫지 마세요. 완료되면 알려드립니다.</div>
     </section>
 
     <!-- 결과 -->
     <section class="results" id="results" style="display:none">
+      <div class="done-banner" id="doneBanner">✅ 분리 완료!</div>
       <h3>결과 <span class="elapsed" id="resultElapsed"></span></h3>
       <div class="result-card">
         <div class="result-head">🎯 target — 뽑아낸 소리</div>
@@ -135,6 +141,8 @@
       <pre id="log" class="log" style="display:none"></pre>
     </section>
   </main>
+
+  <div class="toast-wrap" id="toastWrap"></div>
 
   <script src="renderer.js"></script>
 </body>
