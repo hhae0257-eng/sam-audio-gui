@@ -193,6 +193,89 @@ def is_loaded():
     return _cache["model"] is not None
 
 
+# ── 초보자용 모델 설정(로그인/접근/다운로드) 헬퍼 ──────────────────────
+
+def is_size_ready(size: str = "base") -> bool:
+    """해당 크기 모델이 (로컬 폴더 또는 HF 캐시에) 준비돼 있는지."""
+    local = os.path.join(LOCAL_MODELS, f"sam-audio-{size}")
+    if os.path.isfile(os.path.join(local, "config.json")) and os.path.isfile(
+        os.path.join(local, "checkpoint.pt")
+    ):
+        return True
+    try:
+        from huggingface_hub import hf_hub_download
+
+        hf_hub_download(CKPT[size], "checkpoint.pt", local_files_only=True)
+        return True
+    except Exception:
+        return False
+
+
+def hf_status(size: str = "base") -> dict:
+    """HF 로그인 상태 + 모델 준비 상태."""
+    user, logged_in = None, False
+    try:
+        from huggingface_hub import whoami
+
+        info = whoami()
+        user = info.get("name") if isinstance(info, dict) else str(info)
+        logged_in = True
+    except Exception:
+        pass
+    return {"logged_in": logged_in, "user": user, "ready": is_size_ready(size)}
+
+
+def hf_login(token: str) -> str:
+    """토큰을 저장(로그인)하고 사용자명을 반환. 접근 권한도 확인."""
+    from huggingface_hub import login, whoami
+
+    token = (token or "").strip()
+    if not token:
+        raise ValueError("토큰이 비어 있습니다.")
+    login(token=token, add_to_git_credential=False)
+    info = whoami()
+    user = info.get("name") if isinstance(info, dict) else str(info)
+    return user
+
+
+def check_access(size: str = "base") -> bool:
+    """게이트 모델 접근 권한 확인 (config.json 다운로드로 검증; 작은 파일)."""
+    from huggingface_hub import hf_hub_download
+
+    hf_hub_download(CKPT[size], "config.json")
+    return True
+
+
+# 다운로드 진행 상태 (백그라운드 스레드에서 갱신)
+_dl = {"state": "idle", "size": None, "error": None}
+
+
+def start_download(size: str = "base") -> dict:
+    """모델을 백그라운드로 다운로드 시작. 상태는 /download-status로 폴링."""
+    if _dl["state"] == "downloading":
+        return dict(_dl)
+    if size not in CKPT:
+        raise ValueError(f"알 수 없는 크기: {size}")
+    import threading
+
+    def _run():
+        _dl.update(state="downloading", size=size, error=None)
+        try:
+            from huggingface_hub import snapshot_download
+
+            snapshot_download(repo_id=CKPT[size])
+            _dl.update(state="done")
+        except Exception as e:  # noqa: BLE001
+            _dl.update(state="error", error=str(e))
+
+    threading.Thread(target=_run, daemon=True).start()
+    return dict(_dl)
+
+
+def download_status() -> dict:
+    return dict(_dl)
+
+
 def loaded_size():
     return _cache["size"]
 

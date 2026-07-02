@@ -1,6 +1,6 @@
 {
   "name": "sam-audio-gui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SAM-Audio GUI — text-prompt audio source separation (dialogue / effects / music)",
   "main": "main.js",
   "scripts": {

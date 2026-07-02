@@ -38,6 +38,52 @@ def health():
     }
 
 
+class LoginRequest(BaseModel):
+    token: str
+
+
+class SizeRequest(BaseModel):
+    size: str = "base"
+
+
+@app.get("/model-status")
+def model_status(size: str = "base"):
+    try:
+        return separate.hf_status(size)
+    except Exception as e:  # noqa: BLE001
+        return {"logged_in": False, "user": None, "ready": False, "error": str(e)}
+
+
+@app.post("/hf-login")
+def hf_login(req: LoginRequest):
+    try:
+        user = separate.hf_login(req.token)
+        # 접근 권한까지 확인 (게이트 승인 안 됐으면 여기서 에러)
+        try:
+            separate.check_access("base")
+            access = True
+            access_error = None
+        except Exception as e:  # noqa: BLE001
+            access = False
+            access_error = str(e)
+        return {"ok": True, "user": user, "access": access, "access_error": access_error}
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+
+
+@app.post("/download-model")
+def download_model(req: SizeRequest):
+    try:
+        return separate.start_download(req.size)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@app.get("/download-status")
+def get_download_status():
+    return separate.download_status()
+
+
 @app.post("/separate")
 def do_separate(req: SeparateRequest):
     import time

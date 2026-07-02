@@ -102,6 +102,27 @@ async function separate(payload) {
   return data;
 }
 
+async function getJson(pathname) {
+  if (!proc || !port) await start();
+  const res = await fetch(base() + pathname, { signal: AbortSignal.timeout(15000) });
+  return res.json();
+}
+async function postJson(pathname, body, timeoutMs = 60000) {
+  if (!proc || !port) await start();
+  const res = await fetch(base() + pathname, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  return res.json();
+}
+
+const modelStatus = (size = 'base') => getJson('/model-status?size=' + encodeURIComponent(size));
+const hfLogin = (token) => postJson('/hf-login', { token }, 60000);
+const downloadModel = (size = 'base') => postJson('/download-model', { size }, 20000);
+const downloadStatus = () => getJson('/download-status');
+
 function stop() {
   if (proc) {
     try { proc.kill(); } catch {}
@@ -109,4 +130,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, separate, health, onLog };
+module.exports = { start, stop, separate, health, onLog, modelStatus, hfLogin, downloadModel, downloadStatus };

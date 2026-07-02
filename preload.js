@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('api', {
   toFileUrl: (p) => ipcRenderer.invoke('to-file-url', p),
   notifyDone: (payload) => ipcRenderer.invoke('notify-done', payload),
 
+  modelStatus: (size) => ipcRenderer.invoke('model-status', size),
+  hfLogin: (token) => ipcRenderer.invoke('hf-login', token),
+  downloadModel: (size) => ipcRenderer.invoke('download-model', size),
+  downloadStatus: () => ipcRenderer.invoke('download-status'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
   onBackendLog: (cb) => ipcRenderer.on('backend-log', (_e, m) => cb(m)),
   onJobProgress: (cb) => ipcRenderer.on('job-progress', (_e, m) => cb(m)),
 });

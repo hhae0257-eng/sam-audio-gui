@@ -63,6 +63,25 @@ ipcMain.handle('backend-health', async () => {
   catch (e) { return { status: 'down', error: String(e.message || e) }; }
 });
 
+// 모델 설정(초보자용): 상태 조회 / 로그인 / 다운로드
+ipcMain.handle('model-status', async (_e, size) => {
+  try { return await backend.modelStatus(size || 'base'); }
+  catch (e) { return { logged_in: false, user: null, ready: false, error: String(e.message || e) }; }
+});
+ipcMain.handle('hf-login', async (_e, token) => {
+  try { return await backend.hfLogin(token); }
+  catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+ipcMain.handle('download-model', async (_e, size) => {
+  try { return await backend.downloadModel(size || 'base'); }
+  catch (e) { return { state: 'error', error: String(e.message || e) }; }
+});
+ipcMain.handle('download-status', async () => {
+  try { return await backend.downloadStatus(); }
+  catch (e) { return { state: 'error', error: String(e.message || e) }; }
+});
+ipcMain.handle('open-external', async (_e, url) => { shell.openExternal(url); return true; });
+
 // 파일 선택창
 ipcMain.handle('pick-file', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {

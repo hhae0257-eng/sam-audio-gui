@@ -163,6 +163,15 @@ function updateRunState() {
 // ── 실행 ──────────────────────────────────────────────
 runBtn.addEventListener('click', async () => {
   if (!inputPath) return;
+  // 모델이 준비 안 됐으면 설정 마법사로 안내
+  if (!modelReady) {
+    await refreshModelStatus();
+    if (!modelReady) {
+      showToast('모델 설정 필요', '먼저 모델을 준비해 주세요 (🔑 모델 설정)', true);
+      openSetup();
+      return;
+    }
+  }
   results.style.display = 'none';
   progress.style.display = 'flex';
   runBtn.disabled = true;
@@ -323,6 +332,98 @@ async function refreshStatus() {
   }
 }
 
+// ── 모델 설정 마법사 ──────────────────────────────────
+const setupModal = $('setupModal');
+const openSetupBtn = $('openSetup');
+const tokenInput = $('tokenInput');
+const loginBtn = $('loginBtn');
+const loginStatus = $('loginStatus');
+const dlBtn = $('dlBtn');
+const dlStatus = $('dlStatus');
+const readyBadge = $('readyBadge');
+let modelReady = false;
+let dlPollTimer = null;
+
+function openSetup() { setupModal.style.display = 'flex'; refreshModelStatus(); }
+function closeSetup() { setupModal.style.display = 'none'; }
+
+openSetupBtn.addEventListener('click', openSetup);
+$('setupClose').addEventListener('click', closeSetup);
+$('setupDone').addEventListener('click', closeSetup);
+
+// 외부 링크 버튼 (접근 승인/토큰 발급 페이지)
+document.querySelectorAll('[data-open]').forEach(b => {
+  b.addEventListener('click', () => window.api.openExternal(b.dataset.open));
+});
+
+async function refreshModelStatus() {
+  let s = {};
+  try { s = await window.api.modelStatus('base'); } catch {}
+  const loggedIn = !!s.logged_in;
+  modelReady = !!s.ready;
+  $('step2').classList.toggle('done', loggedIn);
+  $('step3').classList.toggle('done', modelReady);
+  dlBtn.disabled = !loggedIn || modelReady;
+  if (loggedIn) {
+    loginStatus.className = 'step-status ok';
+    loginStatus.textContent = `✅ 로그인됨${s.user ? ': ' + s.user : ''}`;
+  }
+  readyBadge.textContent = modelReady ? '✅ 모델 준비 완료' : '모델 준비 안 됨';
+  readyBadge.classList.toggle('ok', modelReady);
+  openSetupBtn.classList.toggle('need', !modelReady);
+  return s;
+}
+
+loginBtn.addEventListener('click', async () => {
+  const token = tokenInput.value.trim();
+  if (!token) { loginStatus.className = 'step-status err'; loginStatus.textContent = '토큰을 붙여넣어 주세요.'; return; }
+  loginBtn.disabled = true;
+  loginStatus.className = 'step-status info'; loginStatus.textContent = '로그인 중…';
+  const r = await window.api.hfLogin(token);
+  loginBtn.disabled = false;
+  if (r && r.ok) {
+    tokenInput.value = '';
+    if (r.access) {
+      $('step2').classList.add('done');
+      dlBtn.disabled = modelReady;
+      loginStatus.className = 'step-status ok';
+      loginStatus.textContent = `✅ 로그인 완료 (${r.user}) · 접근 승인 확인됨`;
+    } else {
+      loginStatus.className = 'step-status err';
+      loginStatus.textContent = '로그인은 됐지만 모델 접근 권한이 없어요. 1단계에서 접근 승인을 먼저 받으세요.';
+    }
+    refreshModelStatus();
+  } else {
+    loginStatus.className = 'step-status err';
+    loginStatus.textContent = '로그인 실패: ' + ((r && r.error) || '토큰을 확인하세요');
+  }
+});
+
+dlBtn.addEventListener('click', async () => {
+  dlBtn.disabled = true;
+  dlStatus.className = 'step-status info'; dlStatus.textContent = '다운로드 시작…';
+  await window.api.downloadModel('base');
+  if (dlPollTimer) clearInterval(dlPollTimer);
+  dlPollTimer = setInterval(async () => {
+    let st = {};
+    try { st = await window.api.downloadStatus(); } catch {}
+    if (st.state === 'downloading') {
+      dlStatus.className = 'step-status info';
+      dlStatus.textContent = '⬇️ 다운로드 중… (아래 로그에서 진행률 확인 가능)';
+    } else if (st.state === 'done') {
+      clearInterval(dlPollTimer); dlPollTimer = null;
+      dlStatus.className = 'step-status ok'; dlStatus.textContent = '✅ 다운로드 완료!';
+      refreshModelStatus();
+      showToast('✅ 모델 준비 완료', '이제 분리를 실행할 수 있어요', false);
+    } else if (st.state === 'error') {
+      clearInterval(dlPollTimer); dlPollTimer = null;
+      dlBtn.disabled = false;
+      dlStatus.className = 'step-status err'; dlStatus.textContent = '다운로드 실패: ' + (st.error || '');
+    }
+  }, 2500);
+});
+
+// ── 백엔드 상태 ───────────────────────────────────────
 async function boot() {
   applyMode();
   $('statusDot').className = 'dot warn';
@@ -333,6 +434,11 @@ async function boot() {
     log('백엔드 시작 실패: ' + (e.message || e));
   }
   refreshStatus();
+  // 모델 준비 안 됐으면 설정 마법사를 자동으로 띄운다.
+  try {
+    const ms = await refreshModelStatus();
+    if (ms && !ms.ready) openSetup();
+  } catch {}
   setInterval(refreshStatus, 5000);
 }
 boot();

@@ -10,6 +10,7 @@
   <header class="topbar">
     <div class="brand">🎧 SAM-Audio <span class="sub">소리 분리 도구</span></div>
     <div class="status" id="status">
+      <button class="setup-btn" id="openSetup">🔑 모델 설정</button>
       <span class="dot" id="statusDot"></span>
       <span id="statusText">백엔드 확인 중…</span>
     </div>
@@ -141,6 +142,58 @@
       <pre id="log" class="log" style="display:none"></pre>
     </section>
   </main>
+
+  <!-- 초보자용 모델 설정 마법사 -->
+  <div class="modal-overlay" id="setupModal" style="display:none">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>🔑 모델 설정</h2>
+        <button class="modal-close" id="setupClose">✕</button>
+      </div>
+      <p class="modal-desc">SAM-Audio 모델은 Hugging Face에서 받습니다. 아래 3단계만 하면 돼요. <b>(최초 1회)</b></p>
+
+      <div class="step" id="step1">
+        <div class="step-title"><span class="step-num">1</span> 접근 승인 받기</div>
+        <div class="step-body">
+          버튼을 눌러 열리는 페이지에서 로그인 후 <b>동의/접근 요청(Agree and access)</b> 버튼을 누르세요. (Hugging Face 계정 필요 — 무료)
+          <div class="step-actions">
+            <button data-open="https://huggingface.co/facebook/sam-audio-base">① 접근 승인 페이지 열기</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" id="step2">
+        <div class="step-title"><span class="step-num">2</span> 토큰으로 로그인</div>
+        <div class="step-body">
+          토큰 페이지에서 <b>Create new token → Read</b> 로 만들어 복사한 뒤, 아래에 붙여넣고 로그인하세요.
+          <div class="step-actions">
+            <button data-open="https://huggingface.co/settings/tokens">② 토큰 발급 페이지 열기</button>
+          </div>
+          <div class="token-row">
+            <input type="password" id="tokenInput" placeholder="hf_... 여기에 토큰 붙여넣기" />
+            <button id="loginBtn">로그인</button>
+          </div>
+          <div class="step-status" id="loginStatus"></div>
+        </div>
+      </div>
+
+      <div class="step" id="step3">
+        <div class="step-title"><span class="step-num">3</span> 모델 다운로드 <span class="muted-sm">(base · 약 7.7GB)</span></div>
+        <div class="step-body">
+          로그인이 되면 아래 버튼으로 모델을 받습니다. 네트워크에 따라 시간이 걸려요.
+          <div class="step-actions">
+            <button id="dlBtn" disabled>③ 모델 다운로드</button>
+          </div>
+          <div class="step-status" id="dlStatus"></div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <span class="ready-badge" id="readyBadge">모델 준비 안 됨</span>
+        <button id="setupDone">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <div class="toast-wrap" id="toastWrap"></div>
 

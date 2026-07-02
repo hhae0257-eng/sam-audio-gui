@@ -39,38 +39,29 @@ MSST(Bandit) 같은 고정 스템 분리와 달리, **`dog barking`, `footsteps`
 
 ---
 
-## 🔑 모델 받기 (필수 · 중요)
+## 🔑 모델 받기 (앱에서 클릭 몇 번)
 
-SAM-Audio 모델은 **Hugging Face 게이트(gated)** 모델이라, 저장소에 포함돼 있지 않습니다. **직접 접근 승인 + 로그인**이 필요합니다.
+SAM-Audio 모델은 **Hugging Face 게이트(gated)** 모델이라 저장소에 포함돼 있지 않습니다. **터미널 명령 없이 앱 안에서** 받을 수 있어요.
 
-### 1단계 — 접근 승인 요청
-아래 페이지에서 접근 요청 버튼을 누릅니다 (보통 즉시/빠르게 승인):
-- **base (권장, 7.7GB)**: https://huggingface.co/facebook/sam-audio-base
-- (선택) small / large: `.../sam-audio-small`, `.../sam-audio-large`
+`시작하기.bat` 실행 후, 모델이 없으면 **🔑 모델 설정** 창이 자동으로 뜹니다 (또는 우상단 **🔑 모델 설정** 버튼). 3단계만 따라 하세요:
 
-### 2단계 — 로그인 (토큰 등록)
+1. **① 접근 승인 페이지 열기** 버튼 → 열린 페이지에서 로그인 후 **Agree and access** 클릭 (HF 계정 무료)
+2. **② 토큰 발급 페이지 열기** 버튼 → **Create new token → Read** 로 만들어 복사 → 앱의 입력칸에 **붙여넣고 [로그인]**
+3. **③ 모델 다운로드** 버튼 → base(약 7.7GB) 자동 다운로드. 완료되면 준비 끝!
+
+> 토큰은 이 PC의 HF 캐시에만 저장되며, 외부로 전송되지 않습니다.
+
+<details>
+<summary>⌨️ (고급) 터미널로 하기 / 수동 배치</summary>
+
+**터미널 로그인** (구 `huggingface-cli login`은 폐기 → 아래 명령 사용):
 ```
 venv\Scripts\hf auth login
 ```
-- 토큰 발급: https://huggingface.co/settings/tokens (**Read** 권한이면 충분)
-- 붙여넣기 후 `Add token as git credential?`은 `n`이어도 됩니다.
-- ⚠️ 예전 `huggingface-cli login`은 폐기되어 동작하지 않습니다. 반드시 **`hf auth login`** 사용.
-
-### 3단계 — 다운로드 (자동)
-로그인만 돼 있으면, **앱에서 첫 분리를 실행할 때 모델이 자동으로 다운로드**됩니다(HF 캐시에 저장). 별도 작업 불필요.
-
-<details>
-<summary>📁 (선택) 모델을 수동으로 미리 받아두기</summary>
-
-느린 네트워크에서 매번 캐시가 꼬이는 게 싫다면, 로컬 폴더에 직접 넣어둘 수 있습니다.
-`config.json` + `checkpoint.pt` 두 파일을 아래 위치에 두면 앱이 **로컬 폴더를 우선 사용**합니다(재다운로드 안 함):
-
+**로컬 폴더에 수동 배치** — `config.json` + `checkpoint.pt`를 아래 위치에 두면 재다운로드 없이 로컬을 우선 사용:
 ```
-sam-audio-gui\models\sam-audio-base\config.json
-sam-audio-gui\models\sam-audio-base\checkpoint.pt
+sam-audio-gui\models\sam-audio-base\{config.json, checkpoint.pt}
 ```
-
-파일은 HF 저장소 페이지(`facebook/sam-audio-base` → Files)에서 받거나:
 ```
 venv\Scripts\hf download facebook/sam-audio-base config.json checkpoint.pt --local-dir models\sam-audio-base
 ```
