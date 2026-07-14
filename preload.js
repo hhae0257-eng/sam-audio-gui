@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   pickFile: () => ipcRenderer.invoke('pick-file'),
   probe: (p) => ipcRenderer.invoke('probe', p),
   separate: (opts) => ipcRenderer.invoke('separate', opts),
+  cancelSeparate: () => ipcRenderer.invoke('cancel-separate'),
   saveAs: (src, name) => ipcRenderer.invoke('save-as', src, name),
   reveal: (p) => ipcRenderer.invoke('reveal', p),
   toFileUrl: (p) => ipcRenderer.invoke('to-file-url', p),

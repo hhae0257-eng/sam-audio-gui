@@ -82,6 +82,14 @@ ipcMain.handle('download-status', async () => {
 });
 ipcMain.handle('open-external', async (_e, url) => { shell.openExternal(url); return true; });
 
+// 진행 중인 분리 중지 (서버 종료 → GPU 연산 즉시 중단)
+ipcMain.handle('cancel-separate', async () => {
+  backend.cancel();
+  // 서버를 곧바로 재기동해 상태등을 회복시킨다(모델은 다음 분리 때 지연 로드).
+  backend.start().catch(() => {});
+  return true;
+});
+
 // 파일 선택창
 ipcMain.handle('pick-file', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {

@@ -4,6 +4,7 @@ let inputDuration = 0;      // 입력 길이(초) — 예상 소요시간 계산
 let currentMode = 'dialogue';
 let lastResult = null;      // { targetPath, residualPath, remuxPath, isVideo }
 let elapsedTimer = null;
+let cancelling = false;     // 사용자가 중지를 눌렀는지
 
 // 대략적 소요시간 추정 계수 (실시간 배수). 현 GPU/모델 기준 러프값.
 const SPEED_FACTOR = { fast: 26, balanced: 40, quality: 56 };
@@ -61,6 +62,7 @@ const progress = $('progress');
 const progressText = $('progressText');
 const progressElapsed = $('progressElapsed');
 const progressEta = $('progressEta');
+const stopBtn = $('stopBtn');
 const doneBanner = $('doneBanner');
 const toastWrap = $('toastWrap');
 const results = $('results');
@@ -175,6 +177,8 @@ runBtn.addEventListener('click', async () => {
   results.style.display = 'none';
   progress.style.display = 'flex';
   runBtn.disabled = true;
+  cancelling = false;
+  stopBtn.disabled = false;
   startElapsed();
 
   try {
@@ -196,10 +200,17 @@ runBtn.addEventListener('click', async () => {
     window.api.notifyDone({ title: 'SAM-Audio 분리 완료', body: `${fmtDur(wall)} 만에 완료됐습니다.`, ok: true });
   } catch (e) {
     const msg = e.message || String(e);
-    log('❌ 오류: ' + msg);
-    progressText.textContent = '오류가 발생했습니다. 로그를 확인하세요.';
-    showToast('❌ 분리 실패', msg.slice(0, 120), true);
-    window.api.notifyDone({ title: 'SAM-Audio 분리 실패', body: msg.slice(0, 120), ok: false });
+    if (cancelling) {
+      // 사용자가 중지한 경우는 오류가 아님
+      log('⏹ 분리를 중지했습니다.');
+      progressText.textContent = '중지됨';
+      showToast('⏹ 분리 중지됨', '사용자가 중지했습니다', false);
+    } else {
+      log('❌ 오류: ' + msg);
+      progressText.textContent = '오류가 발생했습니다. 로그를 확인하세요.';
+      showToast('❌ 분리 실패', msg.slice(0, 120), true);
+      window.api.notifyDone({ title: 'SAM-Audio 분리 실패', body: msg.slice(0, 120), ok: false });
+    }
   } finally {
     stopElapsed();
     progress.style.display = 'none';
@@ -251,6 +262,14 @@ function startElapsed() {
   }, 100);
 }
 function stopElapsed() { if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; } }
+
+// 중지 버튼 — 진행 중인 분리를 취소(서버 종료로 GPU 연산 즉시 중단)
+stopBtn.addEventListener('click', async () => {
+  cancelling = true;
+  stopBtn.disabled = true;
+  progressText.textContent = '중지하는 중…';
+  try { await window.api.cancelSeparate(); } catch {}
+});
 
 // 화면 우하단 토스트
 function showToast(title, body, isErr) {
@@ -361,6 +380,8 @@ async function refreshModelStatus() {
   try { s = await window.api.modelStatus('base'); } catch {}
   const loggedIn = !!s.logged_in;
   modelReady = !!s.ready;
+  // 한 번이라도 준비 완료된 적 있으면 기억 → 다음부터 설치 팝업 자동으로 안 뜸
+  if (modelReady) { try { localStorage.setItem('samgui_model_ready', '1'); } catch {} }
   $('step2').classList.toggle('done', loggedIn);
   $('step3').classList.toggle('done', modelReady);
   dlBtn.disabled = !loggedIn || modelReady;
@@ -434,10 +455,11 @@ async function boot() {
     log('백엔드 시작 실패: ' + (e.message || e));
   }
   refreshStatus();
-  // 모델 준비 안 됐으면 설정 마법사를 자동으로 띄운다.
+  // 모델이 준비 안 됐고, 지금까지 한 번도 준비된 적 없을 때만 설정 마법사를 자동으로 띄운다.
   try {
     const ms = await refreshModelStatus();
-    if (ms && !ms.ready) openSetup();
+    const everReady = localStorage.getItem('samgui_model_ready') === '1';
+    if (ms && !ms.ready && !everReady) openSetup();
   } catch {}
   setInterval(refreshStatus, 5000);
 }

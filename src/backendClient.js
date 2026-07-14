@@ -71,18 +71,24 @@ async function start() {
 }
 
 // 분리 요청. payload는 server.py /separate 스키마를 따른다.
+let activeController = null;
+
 async function separate(payload) {
   if (!proc || !port) await start();
+  // 사용자가 중간에 중지할 수 있도록 AbortController + 타임아웃(1시간)을 합친다.
+  activeController = new AbortController();
+  const timer = setTimeout(() => { try { activeController.abort('timeout'); } catch {} }, 60 * 60 * 1000);
   let res;
   try {
     res = await fetch(base() + '/separate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      // 대형 파일/large 모델은 오래 걸릴 수 있음 — 넉넉히.
-      signal: AbortSignal.timeout(60 * 60 * 1000),
+      signal: activeController.signal,
     });
   } catch (e) {
+    clearTimeout(timer);
+    activeController = null;
     // fetch 자체 실패 = 연결이 끊김. 서버가 처리 중 종료됐거나(대개 VRAM 부족/OOM) 시간 초과.
     // 죽었을 수 있는 서버를 정리해 다음 시도에 재시작되게 한다.
     stop();
@@ -95,11 +101,21 @@ async function separate(payload) {
       + 'large는 16GB GPU에 안 들어갑니다. base 또는 small 모델, 짧은 클립, 빠름 프리셋을 시도하세요.'
     );
   }
+  clearTimeout(timer);
+  activeController = null;
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }
   if (!res.ok) throw new Error(data.error || ('separate ' + res.status));
   return data;
+}
+
+// 진행 중인 분리를 중지: fetch를 끊고 서버 프로세스를 종료해 GPU 연산을 즉시 멈춘다.
+// (동기 백엔드라 연결만 끊으면 연산이 안 멈추므로 서버를 종료 → 다음 실행 때 자동 재시작)
+function cancel() {
+  try { if (activeController) activeController.abort('cancel'); } catch {}
+  activeController = null;
+  stop();
 }
 
 async function getJson(pathname) {
@@ -130,4 +146,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, separate, health, onLog, modelStatus, hfLogin, downloadModel, downloadStatus };
+module.exports = { start, stop, cancel, separate, health, onLog, modelStatus, hfLogin, downloadModel, downloadStatus };
